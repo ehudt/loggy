@@ -1,0 +1,91 @@
+#!/bin/bash -x
+
+usage() { echo "usage: ${0} ([-c comment] command | -f task_id or keyword)" 1>&2; exit 1; }
+
+init_all() {
+	mkdir $HOME_DIR
+	mkdir $DATABASE
+	touch $LOGFILE
+	echo -e "Command\tComment\tTask ID\tOutput location" > $LOGFILE
+}
+
+rand_str() { cat /dev/urandom | tr -dc A-Za-z0-9 | head -c 5; echo; }
+
+fetch_log() {
+	OUTPUT_FILE=`tail -n +2 ${LOGFILE} | tail -r | grep ${FETCH} | cut -f 4`
+	if [ "${OUTPUT_FILE}" ];
+	then
+		echo "Output location: ${OUTPUT_FILE}"
+		tail ${OUTPUT_FILE}
+	fi
+}
+
+insert_to_log() {
+	echo -e "${1}\t${2}\t${3}\t${4}" >> $LOGFILE
+}
+
+handle_new_command() {
+	COMMAND=${1}
+	COMMENT=${2}
+	NOW=`date "+%s"`
+	RND=`rand_str`
+	TASK_ID="${NOW}_${RND}"
+	OUTPUT_REDIRECT=`mktemp $HOME_DIR/database/${TASK_ID}_output`
+	echo "Command: ${COMMAND}"
+	echo "Task id: ${TASK_ID}"
+	insert_to_log "${COMMAND}" "${COMMENT}" "${TASK_ID}" "${OUTPUT_REDIRECT}"
+	nohup ${COMMAND} > ${OUTPUT_REDIRECT} 2>&1
+}
+
+if [ -z "$HOME" ]
+then
+	echo "Error: The environment variable must be \$HOME defined before using this script."
+fi
+
+HOME_DIR=${HOME}/.loggy
+DATABASE=${HOME_DIR}/database
+LOGFILE=${HOME_DIR}/log
+
+if [ ! -d ${HOME_DIR} ];
+then
+	init_all
+fi
+
+while getopts ":c:f:" opt; do
+	case "$opt" in
+		c)
+			COMMENT=${OPTARG}
+			;;
+		f)
+			FETCH=${OPTARG}
+			;;
+		:)
+			echo "Error: Option -${OPTARG} requires an argument"
+			exit 
+			;;
+		*)
+			usage
+			;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+if [ "${COMMENT}" -a "${FETCH}" ];
+then
+	usage
+fi
+
+if [ -z "$@" ];
+then
+	echo "Error: No command supplied." 1>&2
+fi
+
+COMMAND=$@
+
+if [ "${FETCH}" ];
+then
+	fetch_log "${FETCH}"
+else
+	handle_new_command "${COMMAND}" "${COMMENT}"
+fi
