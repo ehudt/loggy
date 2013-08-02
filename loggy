@@ -1,18 +1,23 @@
-#!/bin/bash -x
+#!/bin/bash
 
-usage() { echo "usage: ${0} ([-c comment] command | -f task_id or keyword)" 1>&2; exit 1; }
+usage() { 
+	echo "usage: ${0} ([-c comment] command | -f task_id or keyword)" 1>&2
+	echo "Default mode runs a command and stores its output in the log database with an optional user comment."
+	echo "Fetch mode (-f) fetches the log of a previous command (could be still running) by task ID or other keyword."
+	exit 1
+}
 
 init_all() {
 	mkdir $HOME_DIR
 	mkdir $DATABASE
 	touch $LOGFILE
-	echo -e "Command\tComment\tTask ID\tOutput location" > $LOGFILE
+	echo -e "Command\tComment\tTask ID\tOutput location\tPID" > $LOGFILE
 }
 
 rand_str() { cat /dev/urandom | tr -dc A-Za-z0-9 | head -c 5; echo; }
 
 fetch_log() {
-	OUTPUT_FILE=`tail -n +2 ${LOGFILE} | tail -r | grep ${FETCH} | cut -f 4`
+	OUTPUT_FILE=`tail -n +2 ${LOGFILE} | tail -r | grep "${FETCH}" | head -n 1 | cut -f 4`
 	if [ "${OUTPUT_FILE}" ];
 	then
 		echo "Output location: ${OUTPUT_FILE}"
@@ -21,7 +26,7 @@ fetch_log() {
 }
 
 insert_to_log() {
-	echo -e "${1}\t${2}\t${3}\t${4}" >> $LOGFILE
+	echo -e "${1}\t${2}\t${3}\t${4}\t${5}" >> $LOGFILE
 }
 
 handle_new_command() {
@@ -31,15 +36,17 @@ handle_new_command() {
 	RND=`rand_str`
 	TASK_ID="${NOW}_${RND}"
 	OUTPUT_REDIRECT=`mktemp $HOME_DIR/database/${TASK_ID}_output`
+	${COMMAND} > ${OUTPUT_REDIRECT} 2>&1 &
+	COMMAND_PID=$!
 	echo "Command: ${COMMAND}"
-	echo "Task id: ${TASK_ID}"
-	insert_to_log "${COMMAND}" "${COMMENT}" "${TASK_ID}" "${OUTPUT_REDIRECT}"
-	nohup ${COMMAND} > ${OUTPUT_REDIRECT} 2>&1
+	echo "Task id: ${TASK_ID}, PID: ${COMMAND_PID}"
+	insert_to_log "${COMMAND}" "${COMMENT}" "${TASK_ID}" "${OUTPUT_REDIRECT}" "${COMMAND_PID}"
 }
 
 if [ -z "$HOME" ]
 then
 	echo "Error: The environment variable must be \$HOME defined before using this script."
+	exit 1
 fi
 
 HOME_DIR=${HOME}/.loggy
@@ -64,6 +71,7 @@ while getopts ":c:f:" opt; do
 			exit 
 			;;
 		*)
+			echo "Invalid option: -${OPTARG}"
 			usage
 			;;
 	esac
@@ -76,16 +84,13 @@ then
 	usage
 fi
 
-if [ -z "$@" ];
-then
-	echo "Error: No command supplied." 1>&2
-fi
-
-COMMAND=$@
-
 if [ "${FETCH}" ];
 then
 	fetch_log "${FETCH}"
-else
+elif [ "$*" ];
+then
+	COMMAND="$*"
 	handle_new_command "${COMMAND}" "${COMMENT}"
+else
+	echo "Error: No command supplied." 1>&2
 fi
