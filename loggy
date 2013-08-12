@@ -17,11 +17,11 @@ init_all() {
 rand_str() { cat /dev/urandom | tr -dc A-Za-z0-9 | head -c 5; echo; }
 
 fetch_log() {
-	OUTPUT_FILE=`tail -n +2 ${LOGFILE} | tail -r | grep "${FETCH}" | head -n 1 | cut -f 4`
+	OUTPUT_FILE=`tail -n +2 ${LOGFILE} | tac | grep "${FETCH}" | head -n 1 | cut -f 4`
 	if [ "${OUTPUT_FILE}" ];
 	then
 		echo "Output location: ${OUTPUT_FILE}"
-		tail ${OUTPUT_FILE}
+		tail -f ${OUTPUT_FILE}
 	fi
 }
 
@@ -35,7 +35,7 @@ handle_new_command() {
 	NOW=`date "+%s"`
 	RND=`rand_str`
 	TASK_ID="${NOW}_${RND}"
-	OUTPUT_REDIRECT=`mktemp $HOME_DIR/database/${TASK_ID}_output`
+	OUTPUT_REDIRECT="$HOME_DIR/database/${TASK_ID}_output"
 	${COMMAND} > ${OUTPUT_REDIRECT} 2>&1 &
 	COMMAND_PID=$!
 	echo "Command: ${COMMAND}"
