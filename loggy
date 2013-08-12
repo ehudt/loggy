@@ -1,6 +1,6 @@
 #!/bin/bash
 
-usage() { 
+usage() {
 	echo "usage: ${0} ([-c comment] command | -f task_id or keyword)" 1>&2
 	echo "Default mode runs a command and stores its output in the log database with an optional user comment."
 	echo "Fetch mode (-f) fetches the log of a previous command (could be still running) by task ID or other keyword."
@@ -21,7 +21,12 @@ fetch_log() {
 	if [ "${OUTPUT_FILE}" ];
 	then
 		echo "Output location: ${OUTPUT_FILE}"
-		tail -f ${OUTPUT_FILE}
+		if [ `grep "${FINISHED}" ${OUTPUT_FILE}` ];
+                then
+                  cat ${OUTPUT_FILE} | grep -v "${FINISHED}"
+                else
+  		  tail -f ${OUTPUT_FILE}
+                fi
 	fi
 }
 
@@ -36,7 +41,8 @@ handle_new_command() {
 	RND=`rand_str`
 	TASK_ID="${NOW}_${RND}"
 	OUTPUT_REDIRECT="$HOME_DIR/database/${TASK_ID}_output"
-	${COMMAND} > ${OUTPUT_REDIRECT} 2>&1 &
+	bash -c "${COMMAND} > ${OUTPUT_REDIRECT} 2>&1 \
+          && echo '${FINISHED}' >> ${OUTPUT_REDIRECT}" &
 	COMMAND_PID=$!
 	echo "Command: ${COMMAND}"
 	echo "Task id: ${TASK_ID} PID: ${COMMAND_PID}"
@@ -52,6 +58,7 @@ fi
 HOME_DIR=${HOME}/.loggy
 DATABASE=${HOME_DIR}/database
 LOGFILE=${HOME_DIR}/log
+FINISHED='+-+-+-+LOGG-FINISHED+-+-+-+'
 
 if [ ! -d ${HOME_DIR} ];
 then
