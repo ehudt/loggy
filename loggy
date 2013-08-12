@@ -39,7 +39,7 @@ handle_new_command() {
 	${COMMAND} > ${OUTPUT_REDIRECT} 2>&1 &
 	COMMAND_PID=$!
 	echo "Command: ${COMMAND}"
-	echo "Task id: ${TASK_ID}, PID: ${COMMAND_PID}"
+	echo "Task id: ${TASK_ID} PID: ${COMMAND_PID}"
 	insert_to_log "${COMMAND}" "${COMMENT}" "${TASK_ID}" "${OUTPUT_REDIRECT}" "${COMMAND_PID}"
 }
 
